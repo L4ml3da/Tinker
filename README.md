@@ -7,19 +7,19 @@
 
 Auto和Get请求默认启用，勾选状态码时，将自动过滤配置中的响应码，该配置将再下一次JS解析中生效，不需要重启Burpsuite
 
-![https://github.com/L4ml3da/Tinker/blob/master/img/config.jpg]()
+![](https://github.com/L4ml3da/Tinker/blob/master/img/config.jpg)
 
 ### 自动Fuzz
 
 自动Fuzz针对于JS中发现的API接口，其接口路径将直接拼接在Host根目录后，可能会因为某些站点存在前置路径导致Fuzz出现大量404，如果需要手动Fuzz，可在后续的Sensitive面板中复制出接口列表再Intruder中手动Fuzz
 
-![https://github.com/L4ml3da/Tinker/blob/master/img/repeater.jpg]()
+![](https://github.com/L4ml3da/Tinker/blob/master/img/repeater.jpg)
 
 ### 信息面板
 
 面板中展示JS中发现的所有敏感信息，列表中将反应不同信息类别的发现个数，可对信息类型进行Filter，并且可通过Copy按钮一键复制文本框内所有内容
 
-![https://github.com/L4ml3da/Tinker/blob/master/img/sensitive.jpg]()
+![](https://github.com/L4ml3da/Tinker/blob/master/img/sensitive.jpg)
 
 ## TODO：
 
