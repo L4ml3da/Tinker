@@ -350,7 +350,7 @@ public class TinkerGUI implements IMessageEditorController {
         final JLabel label2 = new JLabel();
         Font label2Font = this.$$$getFont$$$("Calibri", Font.ITALIC, 16, label2.getFont());
         if (label2Font != null) label2.setFont(label2Font);
-        label2.setText("Authored by L4ml3da V1.0 release");
+        label2.setText("Authored by L4ml3da V1.1 release");
         panel2.add(label2, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 80, false));
         final JLabel label3 = new JLabel();
         label3.setText("Link Repeater");

@@ -41,7 +41,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab {
                         "[+] Good Luck ^_^\n" +
                         "[+]\n" +
                         "[+] #####################################\n" +
-                        "[+]    Tinker v1.0\n" +
+                        "[+]    Tinker v1.1\n" +
                         "[+]    author: L4ml3da\n" +
                         "[+] ####################################\n"
                 );
