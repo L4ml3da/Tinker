@@ -59,16 +59,6 @@ public class httpTester  {
             dataList.add(new repeaterTableData(0, testURL.getHost(), testURL.getPath(), statCode, testLens, testreqResp));
         }
         return dataList;
-        /*
-        testURL = new URL(this.baseURL + "/" + uri);
-        callbacks.printOutput("test url " + testURL.toString());
-        testreqResp = callbacks.makeHttpRequest(http_service, helpers.buildHttpRequest(testURL));
-        callbacks.printOutput("test url resp" + testreqResp.getResponse().toString());
-        statCode = callbacks.getHelpers().analyzeResponse(testreqResp.getResponse()).getStatusCode();
-        callbacks.printOutput("test url resp code" + statCode);
-        testLens = testreqResp.getResponse().length;
-        return new repeaterTableData(0, testURL.getHost(), testURL.getPath(), statCode, testLens, testreqResp);
-         */
     }
 
     public ArrayList<List<String>> buildRequest(String uri) {

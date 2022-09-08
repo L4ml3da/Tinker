@@ -55,7 +55,7 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab {
         callbacks.printOutput("found url " + url);
         callbacks.printOutput("path " + url.getPath());
         callbacks.printOutput("mime " + mime);
-        jsParser jsFinder = new jsParser();
+        jsParser jsFinder = new jsParser(url);
         ArrayList<repeaterTableData> rdata;
 
         /*
@@ -67,12 +67,15 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab {
             e.printStackTrace();
         }
         */
-        if (jsFinder.isTargetFile(url.getPath(), mime)) {
+        if (jsFinder.isTargetFile(mime)) {
             callbacks.printOutput("js file need parser " + url);
             String respStr = new String(baseRequestResponse.getResponse(), StandardCharsets.UTF_8);
             //callbacks.printOutput(respStr);
-            ArrayList<String> allLink = jsFinder.analyzeJS(respStr);
-            tkGUI.updateLinkTable(new linkTableData(0, url.toString(), 0,  0,  allLink, null));
+            jsFinder.analyzeJS(respStr);
+            if(jsFinder.notFoundAnything) {
+                return null;
+            }
+            tkGUI.updateLinkTable(jsFinder.ltd);
             //callbacks.printOutput(allLink.toString());
             httpTester tester = new httpTester(callbacks, baseRequestResponse, url);
             try {
@@ -81,9 +84,10 @@ public class BurpExtender implements IBurpExtender, IScannerCheck, ITab {
                 e.printStackTrace();
             }
             if(tkGUI.UIcon.autoRepeater) {
-                if(!allLink.isEmpty()){
+                ArrayList<String> allAPI = jsFinder.ltd.getAPIList();
+                if(!allAPI.isEmpty()){
                     try {
-                        for(String uri : allLink) {
+                        for(String uri : allAPI) {
                             try {
                                 syncHttpConfig(tester, false);
                             } catch (InterruptedException e) {
