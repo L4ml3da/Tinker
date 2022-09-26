@@ -77,7 +77,7 @@ public class TinkerGUI implements IMessageEditorController {
                 responseTextEditor.setMessage(new byte[]{}, false);
                 repeaterdataModel.setRowCount(0);
                 repeatertableDataMap.clear();
-                repeaterdataModel.fireTableDataChanged();
+                //repeaterdataModel.fireTableDataChanged();
                 repeaterTable.updateUI();
             }
         });
@@ -350,7 +350,7 @@ public class TinkerGUI implements IMessageEditorController {
         final JLabel label2 = new JLabel();
         Font label2Font = this.$$$getFont$$$("Calibri", Font.ITALIC, 16, label2.getFont());
         if (label2Font != null) label2.setFont(label2Font);
-        label2.setText("Authored by L4ml3da V1.1 release");
+        label2.setText("Authored by L4ml3da V1.1.1 release");
         panel2.add(label2, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 80, false));
         final JLabel label3 = new JLabel();
         label3.setText("Link Repeater");
@@ -403,14 +403,15 @@ public class TinkerGUI implements IMessageEditorController {
         linkRepeaterPanel.setLayout(new GridLayoutManager(4, 1, new Insets(0, 0, 0, 0), -1, -1));
         repeaterPane.addTab("Link Repeater", linkRepeaterPanel);
         repeaterScroll = new JScrollPane();
-        linkRepeaterPanel.add(repeaterScroll, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_NORTH, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, new Dimension(-1, 521), null, 0, false));
+        linkRepeaterPanel.add(repeaterScroll, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_NORTH, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, new Dimension(-1, 300), null, 0, false));
         repeaterTable = new JTable();
         repeaterTable.setAutoscrolls(true);
+        repeaterTable.setPreferredScrollableViewportSize(new Dimension(450, 300));
         repeaterScroll.setViewportView(repeaterTable);
         reqrespSplit = new JSplitPane();
         reqrespSplit.setDividerSize(10);
         reqrespSplit.setResizeWeight(0.5);
-        linkRepeaterPanel.add(reqrespSplit, new GridConstraints(2, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, new Dimension(-1, 400), null, 0, false));
+        linkRepeaterPanel.add(reqrespSplit, new GridConstraints(2, 0, 1, 1, GridConstraints.ANCHOR_NORTH, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, new Dimension(-1, 400), null, 0, false));
         tabbedPane1 = new JTabbedPane();
         reqrespSplit.setLeftComponent(tabbedPane1);
         tabbedPane2 = new JTabbedPane();
@@ -421,15 +422,17 @@ public class TinkerGUI implements IMessageEditorController {
         final Spacer spacer4 = new Spacer();
         linkRepeaterPanel.add(spacer4, new GridConstraints(3, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
         final JPanel panel4 = new JPanel();
-        panel4.setLayout(new GridLayoutManager(2, 4, new Insets(0, 0, 0, 0), -1, -1));
+        panel4.setLayout(new GridLayoutManager(3, 4, new Insets(0, 0, 0, 0), -1, -1));
         repeaterPane.addTab("Sensitive Info", panel4);
         linkScroll = new JScrollPane();
-        panel4.add(linkScroll, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        panel4.add(linkScroll, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_NORTH, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_WANT_GROW, null, new Dimension(-1, 600), new Dimension(-1, 600), 0, false));
         linkTable = new JTable();
         linkScroll.setViewportView(linkTable);
         infoScroll = new JScrollPane();
-        panel4.add(infoScroll, new GridConstraints(1, 1, 1, 3, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        panel4.add(infoScroll, new GridConstraints(1, 1, 1, 3, GridConstraints.ANCHOR_NORTH, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(-1, 600), new Dimension(-1, 600), 0, false));
         infoArea = new JTextArea();
+        infoArea.setColumns(50);
+        infoArea.setRows(50);
         infoScroll.setViewportView(infoArea);
         infoclearButton = new JButton();
         infoclearButton.setText("Clear");
@@ -451,6 +454,12 @@ public class TinkerGUI implements IMessageEditorController {
         copyButton = new JButton();
         copyButton.setText("Copy");
         panel4.add(copyButton, new GridConstraints(0, 3, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        final Spacer spacer5 = new Spacer();
+        panel4.add(spacer5, new GridConstraints(2, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        final Spacer spacer6 = new Spacer();
+        panel4.add(spacer6, new GridConstraints(2, 2, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        final Spacer spacer7 = new Spacer();
+        panel4.add(spacer7, new GridConstraints(2, 3, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
     }
 
     /**
