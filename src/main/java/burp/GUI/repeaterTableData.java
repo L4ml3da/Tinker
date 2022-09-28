@@ -8,14 +8,16 @@ public class repeaterTableData {
     public String link;
     public int status;
     public int lens;
+    public String mimeType;
     public IHttpRequestResponse requestResponse;
 
-    public repeaterTableData(int pos, String domain, String link, int status, int lens, IHttpRequestResponse requestResponse) {
+    public repeaterTableData(int pos, String domain, String link, int status, int lens, String mime, IHttpRequestResponse requestResponse) {
         this.pos = pos;
         this.domain = domain;
         this.link = link;
         this.status = status;
         this.lens = lens;
+        this.mimeType = mime;
         this.requestResponse = requestResponse;
     }
 

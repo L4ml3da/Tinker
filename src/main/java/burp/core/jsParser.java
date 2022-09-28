@@ -5,7 +5,9 @@ import burp.GUI.linkTableData;
 
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -14,6 +16,7 @@ public class jsParser {
     public URL url;
     static String[] blackJSFile = {"jquery", "google-analytics", "gpt.js"};
     static String[] blackSuffix = {"png", "jpg", "gif", "css", "js", "ico", "svg", "eot", "woff", "woff2", "ttf", "vue"};
+    static String[] blackURL = {"www.w3.org", "localhost"};
     public linkTableData ltd;
     public boolean notFoundAnything = true;
 
@@ -147,12 +150,23 @@ public class jsParser {
     public ArrayList<String> urlFinder(String str){
         ArrayList<String> url = new ArrayList<>();
         String tmpURL = "";
+        boolean useful = true;
         String is_url = "([\"|'](http|https):\\/\\/([\\w.]+\\/?)\\S*?[\"|'])";
         Matcher matcher = Pattern.compile(is_url).matcher(str);
         while (matcher.find()){
+            useful = true;
             tmpURL = matcher.group();
-            tmpURL = tmpURL.replace("\"", "");
-            url.add(tmpURL);
+            for(String x : blackURL){
+                if(tmpURL.contains(x)){
+                    useful = false;
+                    break;
+                }
+            }
+            if(useful){
+                tmpURL = tmpURL.replace("\"", "");
+                tmpURL = tmpURL.replace("'", "");
+                url.add(tmpURL);
+            }
         }
         if(url.size() != 0) {
             url = new ArrayList<>(new HashSet<>(url));

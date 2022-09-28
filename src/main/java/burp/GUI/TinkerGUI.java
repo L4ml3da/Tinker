@@ -263,8 +263,8 @@ public class TinkerGUI implements IMessageEditorController {
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
         centerRenderer.setHorizontalAlignment(JLabel.CENTER);
         repeaterTable.setDefaultRenderer(Object.class, centerRenderer);
-        String[] title = new String[]{"Pos", "Domain", "URL", "Status", "Length"};
-        repeaterdataModel = new DefaultTableModel(0, 5);
+        String[] title = new String[]{"Pos", "Domain", "URL", "Status", "Length", "MIME"};
+        repeaterdataModel = new DefaultTableModel(0, 6);
         repeaterdataModel.setColumnIdentifiers(title);
 
         repeaterTable.setModel(repeaterdataModel);
@@ -294,6 +294,8 @@ public class TinkerGUI implements IMessageEditorController {
     }
 
     public void updateLinkTable(linkTableData data) {
+        linkclearButton.setEnabled(false);
+        linkclearButton.setVisible(false);
         linktableDataMap.put(linkTable.getRowCount(), data);
         infodataModel.addRow(new String[]{
                 String.valueOf(linkTable.getRowCount()),
@@ -306,11 +308,17 @@ public class TinkerGUI implements IMessageEditorController {
                 String.valueOf(data.getTableDataNum("InterIP")),
                 String.valueOf(data.getTableDataNum("Domain"))
         });
+        linkclearButton.setEnabled(true);
+        linkclearButton.setVisible(true);
     }
 
     public void updateRepeaterTable(repeaterTableData data) {
+        linkclearButton.setEnabled(false);
+        linkclearButton.setVisible(false);
         repeatertableDataMap.put(repeaterTable.getRowCount(), data);
-        repeaterdataModel.addRow(new String[]{String.valueOf(repeaterTable.getRowCount()), data.domain, data.link, String.valueOf(data.status), String.valueOf(data.lens)});
+        repeaterdataModel.addRow(new String[]{String.valueOf(repeaterTable.getRowCount()), data.domain, data.link, String.valueOf(data.status), String.valueOf(data.lens), data.mimeType});
+        linkclearButton.setEnabled(true);
+        linkclearButton.setVisible(true);
     }
 
     {
@@ -350,7 +358,7 @@ public class TinkerGUI implements IMessageEditorController {
         final JLabel label2 = new JLabel();
         Font label2Font = this.$$$getFont$$$("Calibri", Font.ITALIC, 16, label2.getFont());
         if (label2Font != null) label2.setFont(label2Font);
-        label2.setText("Authored by L4ml3da V1.1.1 release");
+        label2.setText("Authored by L4ml3da V1.2.0 release");
         panel2.add(label2, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 80, false));
         final JLabel label3 = new JLabel();
         label3.setText("Link Repeater");
@@ -389,6 +397,7 @@ public class TinkerGUI implements IMessageEditorController {
         GETCheckBox.setText("GET");
         panel1.add(GETCheckBox, new GridConstraints(3, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         POSTCheckBox = new JCheckBox();
+        POSTCheckBox.setSelected(true);
         POSTCheckBox.setText("POST");
         panel1.add(POSTCheckBox, new GridConstraints(3, 2, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         PUTCheckBox = new JCheckBox();
@@ -403,7 +412,7 @@ public class TinkerGUI implements IMessageEditorController {
         linkRepeaterPanel.setLayout(new GridLayoutManager(4, 1, new Insets(0, 0, 0, 0), -1, -1));
         repeaterPane.addTab("Link Repeater", linkRepeaterPanel);
         repeaterScroll = new JScrollPane();
-        linkRepeaterPanel.add(repeaterScroll, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_NORTH, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, new Dimension(-1, 300), null, 0, false));
+        linkRepeaterPanel.add(repeaterScroll, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, new Dimension(-1, 300), null, 0, false));
         repeaterTable = new JTable();
         repeaterTable.setAutoscrolls(true);
         repeaterTable.setPreferredScrollableViewportSize(new Dimension(450, 300));

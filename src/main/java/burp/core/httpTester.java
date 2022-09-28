@@ -42,6 +42,7 @@ public class httpTester  {
         int statCode, testLens;
         URL testURL;
         byte[] req;
+        String mimeType;
         ArrayList<List<String>> hList = buildRequest(uri);
         ArrayList<repeaterTableData> dataList = new ArrayList<>();
 
@@ -50,13 +51,14 @@ public class httpTester  {
             req = helpers.buildHttpMessage(h, "test".getBytes());
             testreqResp = callbacks.makeHttpRequest(http_service, req);
             statCode = callbacks.getHelpers().analyzeResponse(testreqResp.getResponse()).getStatusCode();
+            mimeType = callbacks.getHelpers().analyzeResponse(testreqResp.getResponse()).getStatedMimeType();
             if(filterCode.contains(Integer.toString(statCode))) {
                 callbacks.printOutput("test url resp code " + statCode + " drop");
                 continue;
             }
             callbacks.printOutput("test url resp code" + statCode);
             testLens = testreqResp.getResponse().length;
-            dataList.add(new repeaterTableData(0, testURL.getHost(), testURL.getPath(), statCode, testLens, testreqResp));
+            dataList.add(new repeaterTableData(0, testURL.getHost(), testURL.getPath(), statCode, testLens, mimeType, testreqResp));
         }
         return dataList;
     }
