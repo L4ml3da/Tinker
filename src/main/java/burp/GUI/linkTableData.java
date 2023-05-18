@@ -1,6 +1,7 @@
 package burp.GUI;
 
 import burp.IHttpRequestResponse;
+import burp.core.httpTester;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -8,6 +9,14 @@ import java.util.HashMap;
 public class linkTableData {
     public int pos;
     public String dataFromURL;
+
+    public httpTester ht;
+    public void setHt(httpTester ht) {
+        this.ht = ht;
+    }
+    public httpTester getHt() {
+        return ht;
+    }
     public int apiNumbers;
     public int domainNumbers;
 

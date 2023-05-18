@@ -1,10 +1,10 @@
 package burp.GUI;
 
 import burp.*;
+import burp.core.httpTester;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.uiDesigner.core.GridLayoutManager;
 import com.intellij.uiDesigner.core.Spacer;
-import javafx.scene.control.CheckBox;
 
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
@@ -14,12 +14,15 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
-import java.awt.datatransfer.Transferable;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
+import java.net.MalformedURLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class TinkerGUI implements IMessageEditorController {
     private JPanel rootPanel;
@@ -34,10 +37,6 @@ public class TinkerGUI implements IMessageEditorController {
     private JTable linkTable;
     private JCheckBox autoCheckBox;
     private JCheckBox withCookieCheckBox;
-    private JCheckBox a404CheckBox;
-    private JCheckBox a403CheckBox;
-    private JCheckBox a401CheckBox;
-    private JCheckBox a500CheckBox;
     private JButton linkclearButton;
     private JCheckBox GETCheckBox;
     private JCheckBox POSTCheckBox;
@@ -45,9 +44,17 @@ public class TinkerGUI implements IMessageEditorController {
     private JCheckBox HEADCheckBox;
     private JScrollPane linkScroll;
     private JScrollPane infoScroll;
-    private JButton infoclearButton;
+    private JButton repeatButton;
     private JComboBox FiltercomboBox;
     private JButton copyButton;
+    private JButton applyButton;
+    private JTextField filterSuffixTextField;
+    private JTextField filterCodeTextField;
+    private JTextField filterURLTextField;
+    private JButton infoclearButton;
+    private JTextField filterMIMETextField;
+    private JTextField rootDirectoryTextField;
+    private JLabel repeatStatLabel;
 
 
     private IBurpExtenderCallbacks callbacks;
@@ -58,6 +65,7 @@ public class TinkerGUI implements IMessageEditorController {
     public HashMap<Integer, linkTableData> linktableDataMap = new HashMap<Integer, linkTableData>();
     DefaultTableModel repeaterdataModel;
     DefaultTableModel infodataModel;
+    private final ReadWriteLock repeaterTableLock = new ReentrantReadWriteLock();
 
     public UIStatController UIcon;
 
@@ -70,34 +78,78 @@ public class TinkerGUI implements IMessageEditorController {
         UIcon = new UIStatController();
         initUIStats();
 
+
         linkclearButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 requestTextEditor.setMessage(new byte[]{}, true);
                 responseTextEditor.setMessage(new byte[]{}, false);
                 repeaterdataModel.setRowCount(0);
-                repeatertableDataMap.clear();
+                repeaterTableClear();
                 //repeaterdataModel.fireTableDataChanged();
                 repeaterTable.updateUI();
             }
         });
-        infoclearButton.addActionListener(new ActionListener() {
+        repeatButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                infodataModel.setRowCount(0);
-                linktableDataMap.clear();
-                infoArea.setText("");
-                infodataModel.fireTableDataChanged();
-                linkTable.updateUI();
+                repeatButton.setEnabled(false);
+                repeatStatLabel.setText("working");
+                repeatStatLabel.setForeground(Color.RED);
+                Thread thread = new Thread(() -> {
+                    httpTester ht = null;
+                    ArrayList<repeaterTableData> rdata;
+                    String rootDir = rootDirectoryTextField.getText();
+                    String[] rootDirList = rootDir.replaceAll("\\s+", "").split(",");
+                    ArrayList<String> testApi;
+                    int[] selectedRows = linkTable.getSelectedRows();
+                    for (int i = selectedRows.length - 1; i >= 0; i--) {
+                        testApi = linktableDataMap.get(selectedRows[i]).getAPIList();
+                        callbacks.printOutput("select row repeat " + selectedRows[i]);
+                        callbacks.printOutput("select row js " + linktableDataMap.get(selectedRows[i]).dataFromURL);
+                        callbacks.printOutput("test root list length " + rootDirList.length);
+                        ArrayList<String> realApi = new ArrayList<>();
+                        if (rootDir.length() != 0 && rootDirList.length != 0) {
+                            for (String dir : rootDirList) {
+                                for (int n = 0; n < testApi.size(); n++) {
+                                    realApi.add(dir + "/" + testApi.get(n));
+                                }
+                            }
+                        } else {
+                            realApi.addAll(testApi);
+                        }
+                        ht = linktableDataMap.get(selectedRows[i]).getHt();
+                        ht.configHttp(UIcon.filterCode, UIcon.supportMethod, UIcon.filterBlackMIME, UIcon.withCookie);
+                        for (String api : realApi) {
+                            callbacks.printOutput("repeat test api " + api);
+                            try {
+                                rdata = ht.testLinkReq(api);
+                                for (repeaterTableData res : rdata) {
+                                    updateRepeaterTable(res);
+                                }
+                            } catch (MalformedURLException | InterruptedException malformedURLException) {
+                                malformedURLException.printStackTrace();
+                            }
+                        }
+                    }
+                    SwingUtilities.invokeLater(() -> {
+                                repeatButton.setEnabled(true);
+                                repeatStatLabel.setText("IDLE");
+                                repeatStatLabel.setForeground(Color.GREEN);
+                            }
+                    );
+                });
+                thread.start();
             }
         });
+
         repeaterPane.addComponentListener(new ComponentAdapter() {
         });
         autoCheckBox.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 try {
-                    UIcon.UIStatHandle(UIStatController.UICheckBoxType.Auto, autoCheckBox.isSelected());
+                    UIcon.UIConfigHandle(UIStatController.UIConfigEnum.Auto, autoCheckBox.isSelected(), "");
                 } catch (InterruptedException interruptedException) {
                     interruptedException.printStackTrace();
                 }
@@ -107,47 +159,7 @@ public class TinkerGUI implements IMessageEditorController {
             @Override
             public void actionPerformed(ActionEvent e) {
                 try {
-                    UIcon.UIStatHandle(UIStatController.UICheckBoxType.WithCookie, withCookieCheckBox.isSelected());
-                } catch (InterruptedException interruptedException) {
-                    interruptedException.printStackTrace();
-                }
-            }
-        });
-        a404CheckBox.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                try {
-                    UIcon.UIStatHandle(UIStatController.UICheckBoxType.Code404, a404CheckBox.isSelected());
-                } catch (InterruptedException interruptedException) {
-                    interruptedException.printStackTrace();
-                }
-            }
-        });
-        a403CheckBox.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                try {
-                    UIcon.UIStatHandle(UIStatController.UICheckBoxType.Code403, a403CheckBox.isSelected());
-                } catch (InterruptedException interruptedException) {
-                    interruptedException.printStackTrace();
-                }
-            }
-        });
-        a401CheckBox.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                try {
-                    UIcon.UIStatHandle(UIStatController.UICheckBoxType.Code401, a401CheckBox.isSelected());
-                } catch (InterruptedException interruptedException) {
-                    interruptedException.printStackTrace();
-                }
-            }
-        });
-        a500CheckBox.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                try {
-                    UIcon.UIStatHandle(UIStatController.UICheckBoxType.Code500, a500CheckBox.isSelected());
+                    UIcon.UIConfigHandle(UIStatController.UIConfigEnum.WithCookie, withCookieCheckBox.isSelected(), "");
                 } catch (InterruptedException interruptedException) {
                     interruptedException.printStackTrace();
                 }
@@ -157,7 +169,7 @@ public class TinkerGUI implements IMessageEditorController {
             @Override
             public void actionPerformed(ActionEvent e) {
                 try {
-                    UIcon.UIStatHandle(UIStatController.UICheckBoxType.MethodGET, GETCheckBox.isSelected());
+                    UIcon.UIConfigHandle(UIStatController.UIConfigEnum.MethodGET, GETCheckBox.isSelected(), "");
                 } catch (InterruptedException interruptedException) {
                     interruptedException.printStackTrace();
                 }
@@ -167,7 +179,7 @@ public class TinkerGUI implements IMessageEditorController {
             @Override
             public void actionPerformed(ActionEvent e) {
                 try {
-                    UIcon.UIStatHandle(UIStatController.UICheckBoxType.MethodPost, POSTCheckBox.isSelected());
+                    UIcon.UIConfigHandle(UIStatController.UIConfigEnum.MethodPost, POSTCheckBox.isSelected(), "");
                 } catch (InterruptedException interruptedException) {
                     interruptedException.printStackTrace();
                 }
@@ -177,7 +189,7 @@ public class TinkerGUI implements IMessageEditorController {
             @Override
             public void actionPerformed(ActionEvent e) {
                 try {
-                    UIcon.UIStatHandle(UIStatController.UICheckBoxType.MethodPut, PUTCheckBox.isSelected());
+                    UIcon.UIConfigHandle(UIStatController.UIConfigEnum.MethodPut, PUTCheckBox.isSelected(), "");
                 } catch (InterruptedException interruptedException) {
                     interruptedException.printStackTrace();
                 }
@@ -187,7 +199,7 @@ public class TinkerGUI implements IMessageEditorController {
             @Override
             public void actionPerformed(ActionEvent e) {
                 try {
-                    UIcon.UIStatHandle(UIStatController.UICheckBoxType.MethodHead, HEADCheckBox.isSelected());
+                    UIcon.UIConfigHandle(UIStatController.UIConfigEnum.MethodHead, HEADCheckBox.isSelected(), "");
                 } catch (InterruptedException interruptedException) {
                     interruptedException.printStackTrace();
                 }
@@ -209,20 +221,74 @@ public class TinkerGUI implements IMessageEditorController {
                 clipboard.setContents(selection, selection);
             }
         });
+
+        applyButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    UIcon.UIConfigHandle(UIStatController.UIConfigEnum.BlackMIME, false, filterMIMETextField.getText());
+                    UIcon.UIConfigHandle(UIStatController.UIConfigEnum.BlackSuffix, false, filterSuffixTextField.getText());
+                    UIcon.UIConfigHandle(UIStatController.UIConfigEnum.BlackURL, false, filterURLTextField.getText());
+                    if (!UIcon.UIConfigHandle(UIStatController.UIConfigEnum.StatusCode, false, filterCodeTextField.getText())) {
+                        showCustomDialog("Error", "filter code config error");
+                    } else {
+                        showCustomDialog("Success", "config saved");
+                    }
+                } catch (InterruptedException interruptedException) {
+                    interruptedException.printStackTrace();
+                }
+            }
+        });
+        infoclearButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                infodataModel.setRowCount(0);
+                linktableDataMap.clear();
+                infoArea.setText("");
+                infodataModel.fireTableDataChanged();
+                linkTable.updateUI();
+            }
+        });
     }
 
+    public void showCustomDialog(String title, String msg) {
+        Window window = SwingUtilities.windowForComponent(this.$$$getRootComponent$$$());
+        JDialog dialog = new JDialog(window, title, Dialog.ModalityType.APPLICATION_MODAL);
+
+        JLabel label = new JLabel(msg);
+        label.setHorizontalAlignment(SwingConstants.CENTER);
+        label.setFont(new Font("Arial", Font.PLAIN, 16));
+
+        JButton okButton = new JButton("OK");
+        okButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                dialog.dispose();
+            }
+        });
+
+        JPanel dialogPanel = new JPanel(new BorderLayout());
+        dialogPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        dialogPanel.add(label, BorderLayout.CENTER);
+        dialogPanel.add(okButton, BorderLayout.SOUTH);
+
+        dialog.setContentPane(dialogPanel);
+        dialog.setSize(200, 150);
+        dialog.setLocationRelativeTo(this.$$$getRootComponent$$$());
+        dialog.setVisible(true);
+    }
 
     public void initUIStats() throws InterruptedException {
-        UIcon.UIStatHandle(UIStatController.UICheckBoxType.Auto, autoCheckBox.isSelected());
-        UIcon.UIStatHandle(UIStatController.UICheckBoxType.WithCookie, withCookieCheckBox.isSelected());
-        UIcon.UIStatHandle(UIStatController.UICheckBoxType.Code404, a404CheckBox.isSelected());
-        UIcon.UIStatHandle(UIStatController.UICheckBoxType.Code403, a403CheckBox.isSelected());
-        UIcon.UIStatHandle(UIStatController.UICheckBoxType.Code401, a401CheckBox.isSelected());
-        UIcon.UIStatHandle(UIStatController.UICheckBoxType.Code500, a500CheckBox.isSelected());
-        UIcon.UIStatHandle(UIStatController.UICheckBoxType.MethodGET, GETCheckBox.isSelected());
-        UIcon.UIStatHandle(UIStatController.UICheckBoxType.MethodPost, POSTCheckBox.isSelected());
-        UIcon.UIStatHandle(UIStatController.UICheckBoxType.MethodPut, PUTCheckBox.isSelected());
-        UIcon.UIStatHandle(UIStatController.UICheckBoxType.MethodHead, HEADCheckBox.isSelected());
+        UIcon.UIConfigHandle(UIStatController.UIConfigEnum.Auto, autoCheckBox.isSelected(), "");
+        UIcon.UIConfigHandle(UIStatController.UIConfigEnum.WithCookie, withCookieCheckBox.isSelected(), "");
+        UIcon.UIConfigHandle(UIStatController.UIConfigEnum.MethodGET, GETCheckBox.isSelected(), "");
+        UIcon.UIConfigHandle(UIStatController.UIConfigEnum.MethodPost, POSTCheckBox.isSelected(), "");
+        UIcon.UIConfigHandle(UIStatController.UIConfigEnum.MethodPut, PUTCheckBox.isSelected(), "");
+        UIcon.UIConfigHandle(UIStatController.UIConfigEnum.MethodHead, HEADCheckBox.isSelected(), "");
+        UIcon.UIConfigHandle(UIStatController.UIConfigEnum.StatusCode, false, filterCodeTextField.getText());
+        UIcon.UIConfigHandle(UIStatController.UIConfigEnum.BlackSuffix, false, filterSuffixTextField.getText());
+        UIcon.UIConfigHandle(UIStatController.UIConfigEnum.BlackURL, false, filterURLTextField.getText());
+        UIcon.UIConfigHandle(UIStatController.UIConfigEnum.BlackMIME, false, filterMIMETextField.getText());
     }
 
     public void initSensitiveInfoPane() {
@@ -282,9 +348,9 @@ public class TinkerGUI implements IMessageEditorController {
             @Override
             public void valueChanged(ListSelectionEvent e) {
                 int rowIdx = Integer.parseInt(repeaterTable.getValueAt(repeaterTable.getSelectedRow(), 0).toString());
-                requestTextEditor.setMessage(repeatertableDataMap.get(rowIdx).requestResponse.getRequest(), true);
-                responseTextEditor.setMessage(repeatertableDataMap.get(rowIdx).requestResponse.getResponse(), false);
-                currentlyDisplayedItem = repeatertableDataMap.get(rowIdx).requestResponse;
+                requestTextEditor.setMessage(repeaterTableGet(rowIdx).requestResponse.getRequest(), true);
+                responseTextEditor.setMessage(repeaterTableGet(rowIdx).requestResponse.getResponse(), false);
+                currentlyDisplayedItem = repeaterTableGet(rowIdx).requestResponse;
                 //repeaterTable.getSelectedRow();
                 //requestTextEditor.setMessage(tableDataMap.get(repeaterTable.getSelectedRow()).requestResponse.getRequest(), true);
                 //responseTextEditor.setMessage(tableDataMap.get(repeaterTable.getSelectedRow()).requestResponse.getResponse(), false);
@@ -294,8 +360,7 @@ public class TinkerGUI implements IMessageEditorController {
     }
 
     public void updateLinkTable(linkTableData data) {
-        linkclearButton.setEnabled(false);
-        linkclearButton.setVisible(false);
+        infoclearButton.setEnabled(false);
         linktableDataMap.put(linkTable.getRowCount(), data);
         infodataModel.addRow(new String[]{
                 String.valueOf(linkTable.getRowCount()),
@@ -308,17 +373,41 @@ public class TinkerGUI implements IMessageEditorController {
                 String.valueOf(data.getTableDataNum("InterIP")),
                 String.valueOf(data.getTableDataNum("Domain"))
         });
-        linkclearButton.setEnabled(true);
-        linkclearButton.setVisible(true);
+        infoclearButton.setEnabled(true);
+    }
+
+    public void repeaterTableClear() {
+        repeaterTableLock.writeLock().lock();
+        try {
+            repeatertableDataMap.clear();
+        } finally {
+            repeaterTableLock.writeLock().unlock();
+        }
+    }
+
+    public void repeaterTablePut(repeaterTableData v) {
+        repeaterTableLock.writeLock().lock();
+        try {
+            repeatertableDataMap.put(repeaterTable.getRowCount(), v);
+            repeaterdataModel.addRow(new String[]{String.valueOf(repeaterTable.getRowCount()), v.domain, v.link, String.valueOf(v.status), String.valueOf(v.lens), v.mimeType});
+        } finally {
+            repeaterTableLock.writeLock().unlock();
+        }
+    }
+
+    public repeaterTableData repeaterTableGet(Integer k) {
+        repeaterTableLock.readLock().lock();
+        try {
+            return repeatertableDataMap.get(k);
+        } finally {
+            repeaterTableLock.readLock().unlock();
+        }
     }
 
     public void updateRepeaterTable(repeaterTableData data) {
         linkclearButton.setEnabled(false);
-        linkclearButton.setVisible(false);
-        repeatertableDataMap.put(repeaterTable.getRowCount(), data);
-        repeaterdataModel.addRow(new String[]{String.valueOf(repeaterTable.getRowCount()), data.domain, data.link, String.valueOf(data.status), String.valueOf(data.lens), data.mimeType});
+        repeaterTablePut(data);
         linkclearButton.setEnabled(true);
-        linkclearButton.setVisible(true);
     }
 
     {
@@ -340,11 +429,11 @@ public class TinkerGUI implements IMessageEditorController {
         repeaterPane = new JTabbedPane();
         rootPanel.add(repeaterPane, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, new Dimension(200, 200), null, 0, false));
         final JPanel panel1 = new JPanel();
-        panel1.setLayout(new GridLayoutManager(5, 6, new Insets(0, 0, 0, 0), -1, -1));
+        panel1.setLayout(new GridLayoutManager(10, 10, new Insets(0, 0, 0, 0), -1, -1));
         repeaterPane.addTab("Tinker Menu", panel1);
         final JPanel panel2 = new JPanel();
         panel2.setLayout(new GridLayoutManager(3, 1, new Insets(0, 0, 0, 0), -1, -1));
-        panel1.add(panel2, new GridConstraints(0, 0, 1, 6, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, null, null, 0, false));
+        panel1.add(panel2, new GridConstraints(0, 0, 1, 10, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, null, null, 0, false));
         final JSeparator separator1 = new JSeparator();
         panel2.add(separator1, new GridConstraints(2, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
         final JPanel panel3 = new JPanel();
@@ -358,56 +447,76 @@ public class TinkerGUI implements IMessageEditorController {
         final JLabel label2 = new JLabel();
         Font label2Font = this.$$$getFont$$$("Calibri", Font.ITALIC, 16, label2.getFont());
         if (label2Font != null) label2.setFont(label2Font);
-        label2.setText("Authored by L4ml3da V1.2.0 release");
+        label2.setText("Authored by L4ml3da V1.3.0 release");
         panel2.add(label2, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 80, false));
         final JLabel label3 = new JLabel();
         label3.setText("Link Repeater");
-        panel1.add(label3, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(100, -1), null, 3, false));
+        panel1.add(label3, new GridConstraints(1, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(100, -1), null, 3, false));
         autoCheckBox = new JCheckBox();
         autoCheckBox.setSelected(true);
         autoCheckBox.setText("Auto");
-        panel1.add(autoCheckBox, new GridConstraints(1, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        panel1.add(autoCheckBox, new GridConstraints(1, 2, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         final Spacer spacer1 = new Spacer();
-        panel1.add(spacer1, new GridConstraints(1, 5, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, 1, null, null, null, 0, false));
+        panel1.add(spacer1, new GridConstraints(1, 9, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, 1, null, null, null, 0, false));
+        final Spacer spacer2 = new Spacer();
+        panel1.add(spacer2, new GridConstraints(3, 9, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, 1, null, null, null, 0, false));
+        final Spacer spacer3 = new Spacer();
+        panel1.add(spacer3, new GridConstraints(9, 0, 1, 2, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        filterSuffixTextField = new JTextField();
+        filterSuffixTextField.setText("png,jpg,gif,css,js,ico,svg,eot,woff,woff2,ttf,vue");
+        panel1.add(filterSuffixTextField, new GridConstraints(4, 2, 1, 7, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(150, -1), null, 0, false));
         withCookieCheckBox = new JCheckBox();
         withCookieCheckBox.setText("WithCookie");
-        panel1.add(withCookieCheckBox, new GridConstraints(1, 2, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        panel1.add(withCookieCheckBox, new GridConstraints(1, 3, 1, 3, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        filterURLTextField = new JTextField();
+        filterURLTextField.setText("www.w3.org,localhost");
+        panel1.add(filterURLTextField, new GridConstraints(6, 2, 1, 7, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(150, -1), null, 0, false));
+        filterCodeTextField = new JTextField();
+        filterCodeTextField.setText("400,404,405,502,503,504");
+        panel1.add(filterCodeTextField, new GridConstraints(3, 2, 1, 7, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(150, -1), null, 0, false));
+        final Spacer spacer4 = new Spacer();
+        panel1.add(spacer4, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, 1, null, null, null, 0, false));
         final JLabel label4 = new JLabel();
         label4.setText("Filter status code");
-        panel1.add(label4, new GridConstraints(2, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, new Dimension(100, -1), null, null, 2, false));
-        a404CheckBox = new JCheckBox();
-        a404CheckBox.setText("404");
-        panel1.add(a404CheckBox, new GridConstraints(2, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
-        a403CheckBox = new JCheckBox();
-        a403CheckBox.setText("403");
-        panel1.add(a403CheckBox, new GridConstraints(2, 2, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
-        a401CheckBox = new JCheckBox();
-        a401CheckBox.setText("401");
-        panel1.add(a401CheckBox, new GridConstraints(2, 3, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
-        a500CheckBox = new JCheckBox();
-        a500CheckBox.setText("500");
-        panel1.add(a500CheckBox, new GridConstraints(2, 4, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
-        final Spacer spacer2 = new Spacer();
-        panel1.add(spacer2, new GridConstraints(2, 5, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, 1, null, null, null, 0, false));
+        panel1.add(label4, new GridConstraints(3, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, new Dimension(100, -1), null, null, 2, false));
         final JLabel label5 = new JLabel();
-        label5.setText("Http Method");
-        panel1.add(label5, new GridConstraints(3, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 3, false));
+        label5.setText("Filter black suffix");
+        panel1.add(label5, new GridConstraints(4, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        final JLabel label6 = new JLabel();
+        label6.setText("Filter black URL");
+        panel1.add(label6, new GridConstraints(6, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        final JLabel label7 = new JLabel();
+        label7.setText("Filter MIME");
+        panel1.add(label7, new GridConstraints(5, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        filterMIMETextField = new JTextField();
+        filterMIMETextField.setText("");
+        panel1.add(filterMIMETextField, new GridConstraints(5, 2, 1, 7, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(150, -1), null, 0, false));
+        final JLabel label8 = new JLabel();
+        label8.setText("Http Method");
+        panel1.add(label8, new GridConstraints(2, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 3, false));
         GETCheckBox = new JCheckBox();
         GETCheckBox.setSelected(true);
         GETCheckBox.setText("GET");
-        panel1.add(GETCheckBox, new GridConstraints(3, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        panel1.add(GETCheckBox, new GridConstraints(2, 2, 1, 2, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         POSTCheckBox = new JCheckBox();
         POSTCheckBox.setSelected(true);
         POSTCheckBox.setText("POST");
-        panel1.add(POSTCheckBox, new GridConstraints(3, 2, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        panel1.add(POSTCheckBox, new GridConstraints(2, 4, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         PUTCheckBox = new JCheckBox();
         PUTCheckBox.setText("PUT");
-        panel1.add(PUTCheckBox, new GridConstraints(3, 3, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        panel1.add(PUTCheckBox, new GridConstraints(2, 5, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         HEADCheckBox = new JCheckBox();
         HEADCheckBox.setText("HEAD");
-        panel1.add(HEADCheckBox, new GridConstraints(3, 4, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
-        final Spacer spacer3 = new Spacer();
-        panel1.add(spacer3, new GridConstraints(4, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        panel1.add(HEADCheckBox, new GridConstraints(2, 6, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        final JLabel label9 = new JLabel();
+        label9.setText("Root Directory");
+        panel1.add(label9, new GridConstraints(7, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        rootDirectoryTextField = new JTextField();
+        rootDirectoryTextField.setText("");
+        panel1.add(rootDirectoryTextField, new GridConstraints(7, 2, 1, 7, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(150, -1), null, 0, false));
+        applyButton = new JButton();
+        applyButton.setText("Apply");
+        panel1.add(applyButton, new GridConstraints(8, 4, 1, 2, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         linkRepeaterPanel = new JPanel();
         linkRepeaterPanel.setLayout(new GridLayoutManager(4, 1, new Insets(0, 0, 0, 0), -1, -1));
         repeaterPane.addTab("Link Repeater", linkRepeaterPanel);
@@ -428,27 +537,27 @@ public class TinkerGUI implements IMessageEditorController {
         linkclearButton = new JButton();
         linkclearButton.setText("Clear");
         linkRepeaterPanel.add(linkclearButton, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 1, false));
-        final Spacer spacer4 = new Spacer();
-        linkRepeaterPanel.add(spacer4, new GridConstraints(3, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        final Spacer spacer5 = new Spacer();
+        linkRepeaterPanel.add(spacer5, new GridConstraints(3, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
         final JPanel panel4 = new JPanel();
-        panel4.setLayout(new GridLayoutManager(3, 4, new Insets(0, 0, 0, 0), -1, -1));
+        panel4.setLayout(new GridLayoutManager(3, 8, new Insets(0, 0, 0, 0), -1, -1));
         repeaterPane.addTab("Sensitive Info", panel4);
         linkScroll = new JScrollPane();
-        panel4.add(linkScroll, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_NORTH, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_WANT_GROW, null, new Dimension(-1, 600), new Dimension(-1, 600), 0, false));
+        panel4.add(linkScroll, new GridConstraints(1, 0, 1, 4, GridConstraints.ANCHOR_NORTH, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_WANT_GROW, null, new Dimension(-1, 600), new Dimension(-1, 600), 0, false));
         linkTable = new JTable();
         linkScroll.setViewportView(linkTable);
         infoScroll = new JScrollPane();
-        panel4.add(infoScroll, new GridConstraints(1, 1, 1, 3, GridConstraints.ANCHOR_NORTH, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(-1, 600), new Dimension(-1, 600), 0, false));
+        panel4.add(infoScroll, new GridConstraints(1, 4, 1, 4, GridConstraints.ANCHOR_NORTH, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(-1, 600), new Dimension(-1, 600), 0, false));
         infoArea = new JTextArea();
         infoArea.setColumns(50);
         infoArea.setRows(50);
         infoScroll.setViewportView(infoArea);
-        infoclearButton = new JButton();
-        infoclearButton.setText("Clear");
-        panel4.add(infoclearButton, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 1, false));
-        final JLabel label6 = new JLabel();
-        label6.setText("Filter");
-        panel4.add(label6, new GridConstraints(0, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        repeatButton = new JButton();
+        repeatButton.setText("Repeat");
+        panel4.add(repeatButton, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 1, false));
+        final JLabel label10 = new JLabel();
+        label10.setText("Filter");
+        panel4.add(label10, new GridConstraints(0, 4, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         FiltercomboBox = new JComboBox();
         final DefaultComboBoxModel defaultComboBoxModel1 = new DefaultComboBoxModel();
         defaultComboBoxModel1.addElement("Api");
@@ -459,16 +568,27 @@ public class TinkerGUI implements IMessageEditorController {
         defaultComboBoxModel1.addElement("InterIP");
         defaultComboBoxModel1.addElement("Domain");
         FiltercomboBox.setModel(defaultComboBoxModel1);
-        panel4.add(FiltercomboBox, new GridConstraints(0, 2, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        panel4.add(FiltercomboBox, new GridConstraints(0, 5, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         copyButton = new JButton();
         copyButton.setText("Copy");
-        panel4.add(copyButton, new GridConstraints(0, 3, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
-        final Spacer spacer5 = new Spacer();
-        panel4.add(spacer5, new GridConstraints(2, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        panel4.add(copyButton, new GridConstraints(0, 6, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         final Spacer spacer6 = new Spacer();
-        panel4.add(spacer6, new GridConstraints(2, 2, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        panel4.add(spacer6, new GridConstraints(2, 0, 1, 4, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
         final Spacer spacer7 = new Spacer();
-        panel4.add(spacer7, new GridConstraints(2, 3, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        panel4.add(spacer7, new GridConstraints(2, 5, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        final Spacer spacer8 = new Spacer();
+        panel4.add(spacer8, new GridConstraints(2, 6, 1, 2, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_VERTICAL, 1, GridConstraints.SIZEPOLICY_WANT_GROW, null, null, null, 0, false));
+        final Spacer spacer9 = new Spacer();
+        panel4.add(spacer9, new GridConstraints(0, 7, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, 1, null, null, null, 0, false));
+        infoclearButton = new JButton();
+        infoclearButton.setText("Clear");
+        panel4.add(infoclearButton, new GridConstraints(0, 3, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        final Spacer spacer10 = new Spacer();
+        panel4.add(spacer10, new GridConstraints(0, 2, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, 1, null, null, null, 0, false));
+        repeatStatLabel = new JLabel();
+        repeatStatLabel.setForeground(new Color(-15287512));
+        repeatStatLabel.setText("IDLE");
+        panel4.add(repeatStatLabel, new GridConstraints(0, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
     }
 
     /**
