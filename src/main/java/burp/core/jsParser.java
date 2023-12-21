@@ -2,6 +2,7 @@ package burp.core;
 
 
 import burp.GUI.linkTableData;
+import burp.IHttpRequestResponse;
 
 import java.net.URL;
 import java.util.ArrayList;
@@ -15,13 +16,16 @@ public class jsParser {
 
     public URL url;
     static String[] blackJSFile = {"jquery", "google-analytics", "gpt.js"};
-    static String[] blackSuffix = {"png", "jpg", "gif", "css", "js", "ico", "svg", "eot", "woff", "woff2", "ttf", "vue"};
-    static String[] blackURL = {"www.w3.org", "localhost"};
+    public ArrayList<String> blackSuffix;
+    public ArrayList<String> blackURL;
     public linkTableData ltd;
     public boolean notFoundAnything = true;
+    public IHttpRequestResponse baseReqResp;
 
-    public jsParser(URL url) {
+    public jsParser(URL url, ArrayList<String> bs, ArrayList<String> bu) {
         this.url = url;
+        blackURL = new ArrayList<>(bu);
+        blackSuffix = new ArrayList<>(bs);
         this.ltd = new linkTableData(url.toString());
     }
 
@@ -47,6 +51,7 @@ public class jsParser {
             "(?:\"|')";
 
     public Boolean isTargetFile (String mime) {
+        /*
         String uri = url.getPath();
         if(!uri.endsWith(".js") || !mime.toLowerCase().contains("script")) {
             return false;
@@ -56,6 +61,8 @@ public class jsParser {
                 return false;
             }
         }
+
+         */
         return true;
     }
 
@@ -95,7 +102,7 @@ public class jsParser {
             s = s.replace("\"", "");
             s = s.replace("'", "");
             for (String x : blackSuffix) {
-                if (s.endsWith(x) || s.startsWith("http")) {
+                if (s.endsWith(x) || s.startsWith("http") || s.contains(".".concat(x))) {
                     useful = false;
                     break;
                 }

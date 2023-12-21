@@ -17,6 +17,7 @@ public class httpTester  {
     public String baseURL;
     public ArrayList<String> filterCode = new ArrayList<>();
     public ArrayList<String> supportMethod = new ArrayList<>();
+    public ArrayList<String> blackMIME = new ArrayList<>();
     public boolean withCookie = false;
 
     public httpTester(IBurpExtenderCallbacks callbacks, IHttpRequestResponse baseReqResp, URL singleURL) {
@@ -31,13 +32,20 @@ public class httpTester  {
         }
     }
 
-    public void configHttp(ArrayList<String> fcode, ArrayList<String> sm, boolean withcookie) {
-        filterCode = fcode;
-        supportMethod = sm;
+    public void configHttp(ArrayList<String> fcode, ArrayList<String> sm, ArrayList<String> bm, boolean withcookie) {
+        filterCode.clear();
+        filterCode.addAll(fcode);
+
+        supportMethod.clear();
+        supportMethod.addAll(sm);
+
+        blackMIME.clear();
+        blackMIME.addAll(bm);
+
         withCookie = withcookie;
     }
 
-    public ArrayList<repeaterTableData> testLinkReq(String uri) throws MalformedURLException {
+    public ArrayList<repeaterTableData> testLinkReq(String uri) throws MalformedURLException, InterruptedException {
         IHttpRequestResponse testreqResp;
         int statCode, testLens;
         URL testURL;
@@ -47,18 +55,39 @@ public class httpTester  {
         ArrayList<repeaterTableData> dataList = new ArrayList<>();
 
         testURL = new URL(this.baseURL + "/" + uri);
+        boolean dropHttp;
         for(List<String> h : hList) {
-            req = helpers.buildHttpMessage(h, "test".getBytes());
-            testreqResp = callbacks.makeHttpRequest(http_service, req);
-            statCode = callbacks.getHelpers().analyzeResponse(testreqResp.getResponse()).getStatusCode();
-            mimeType = callbacks.getHelpers().analyzeResponse(testreqResp.getResponse()).getStatedMimeType();
-            if(filterCode.contains(Integer.toString(statCode))) {
-                callbacks.printOutput("test url resp code " + statCode + " drop");
-                continue;
+            dropHttp = false;
+            if (h.get(0).toUpperCase().startsWith("POST") || h.get(0).toUpperCase().startsWith("PUT")) {
+                req = helpers.buildHttpMessage(h, "test".getBytes());
+            } else {
+                req = helpers.buildHttpMessage(h, null);
             }
-            callbacks.printOutput("test url resp code" + statCode);
-            testLens = testreqResp.getResponse().length;
-            dataList.add(new repeaterTableData(0, testURL.getHost(), testURL.getPath(), statCode, testLens, mimeType, testreqResp));
+            try {
+                testreqResp = callbacks.makeHttpRequest(http_service, req);
+                statCode = callbacks.getHelpers().analyzeResponse(testreqResp.getResponse()).getStatusCode();
+                mimeType = callbacks.getHelpers().analyzeResponse(testreqResp.getResponse()).getStatedMimeType();
+                if(filterCode.contains(Integer.toString(statCode))) {
+                    callbacks.printOutput("test url resp code " + statCode + " drop");
+                    continue;
+                }
+                if(mimeType.length() != 0) {
+                    for(String mt : blackMIME ) {
+                        if(mt.toUpperCase().contains(mimeType.toUpperCase())) {
+                            dropHttp = true;
+                            break;
+                        }
+                    }
+                }
+                if(dropHttp) {
+                    continue;
+                }
+                callbacks.printOutput("test url " + testURL.getHost() +  " " + testURL.getPath() +  " resp code" + statCode);
+                testLens = testreqResp.getResponse().length;
+                dataList.add(new repeaterTableData(0, testURL.getHost(), testURL.getPath(), statCode, testLens, mimeType, testreqResp));
+            } catch (Exception e) {
+                callbacks.printOutput(e.toString());
+            }
         }
         return dataList;
     }

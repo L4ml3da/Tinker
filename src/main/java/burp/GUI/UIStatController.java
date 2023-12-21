@@ -1,9 +1,7 @@
 package burp.GUI;
 
 import java.net.StandardSocketOptions;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -14,53 +12,41 @@ public class UIStatController {
     private static final ReentrantLock valueChangeStatlock = new ReentrantLock();
     public ArrayList<String> filterCode = new ArrayList<>();
     public ArrayList<String> supportMethod = new ArrayList<>();
+
+    public ArrayList<String> filterBlackSuffix ;
+    public ArrayList<String> filterBlackURL;
+    public ArrayList<String> filterBlackMIME;
     public boolean withCookie = false;
     public boolean autoRepeater = false;
 
 
-    public enum stats {
-        ON,
-        OFF
-    }
-
-    public enum UICheckBoxType {
+    public enum UIConfigEnum {
         Auto,
         WithCookie,
-        Code404,
-        Code403,
-        Code401,
-        Code500,
         MethodGET,
         MethodPost,
         MethodPut,
         MethodHead,
+        StatusCode,
+        BlackSuffix,
+        BlackURL,
+        BlackMIME
     }
 
-
-    public HashMap<UICheckBoxType, stats> UIStatMap = new HashMap<>();
-    public HashMap<UICheckBoxType, String> httpConfigStrMap = new HashMap<>();
+    public HashMap<UIConfigEnum, String> httpConfigStrMap = new HashMap<>();
 
     public UIStatController() {
-        for(UICheckBoxType box : UICheckBoxType.values()) {
-            UIStatMap.put(box, stats.OFF);
-        }
-        httpConfigStrMap.put(UICheckBoxType.Code404, "404");
-        httpConfigStrMap.put(UICheckBoxType.Code403, "403");
-        httpConfigStrMap.put(UICheckBoxType.Code401, "401");
-        httpConfigStrMap.put(UICheckBoxType.Code500, "500");
-        httpConfigStrMap.put(UICheckBoxType.MethodGET, "GET");
-        httpConfigStrMap.put(UICheckBoxType.MethodPost, "POST");
-        httpConfigStrMap.put(UICheckBoxType.MethodPut, "PUT");
-        httpConfigStrMap.put(UICheckBoxType.MethodHead, "HEAD");
+        httpConfigStrMap.put(UIConfigEnum.MethodGET, "GET");
+        httpConfigStrMap.put(UIConfigEnum.MethodPost, "POST");
+        httpConfigStrMap.put(UIConfigEnum.MethodPut, "PUT");
+        httpConfigStrMap.put(UIConfigEnum.MethodHead, "HEAD");
     }
 
-    public void updateUIStatMap(UICheckBoxType boxType, stats nowStat) {
-        UIStatMap.put(boxType, nowStat);
-    }
 
     public boolean needSync() throws InterruptedException {
         if(valueChangeStatlock.tryLock(1, TimeUnit.SECONDS)){
             if(valueNeedSync) {
+                valueNeedSync = false;
                 valueChangeStatlock.unlock();
                 return true;
             } else {
@@ -71,90 +57,99 @@ public class UIStatController {
         return false;
     }
 
-    public void UIStatHandle(UICheckBoxType boxType, boolean selected) throws InterruptedException {
+    public boolean UIConfigHandle(UIConfigEnum type, boolean selected, String input) throws InterruptedException {
         while (true) {
-            if(valueChangeStatlock.tryLock(1, TimeUnit.SECONDS)){
-                valueNeedSync = true;
-                if(selected) {
-                    updateUIStatMap(boxType, stats.ON);
-                } else {
-                    updateUIStatMap(boxType, stats.OFF);
-                }
-                valueChangeStatlock.unlock();
+            if(valueChangeStatlock.tryLock(2, TimeUnit.SECONDS)){
                 break;
             }
         }
-    }
-
-    public void syncUIStats() throws InterruptedException {
-        filterCode.clear();
-        supportMethod.clear();
-        for(Map.Entry<UICheckBoxType, stats> entry : UIStatMap.entrySet()) {
-            switch (entry.getKey()) {
-                case Auto:
-                    if(getCheckBoxStat(UICheckBoxType.Auto) == stats.ON) {
-                        autoRepeater = true;
+        switch (type) {
+            case Auto:
+                autoRepeater = selected;
+                break;
+            case WithCookie:
+                withCookie = selected;
+                break;
+            case MethodGET:
+                if (selected) {
+                    if (!supportMethod.contains(httpConfigStrMap.get(UIConfigEnum.MethodGET))) {
+                        supportMethod.add(httpConfigStrMap.get(UIConfigEnum.MethodGET));
+                    }
+                } else {
+                    if (supportMethod.contains(httpConfigStrMap.get(UIConfigEnum.MethodGET))) {
+                        supportMethod.remove(httpConfigStrMap.get(UIConfigEnum.MethodGET));
+                    }
+                }
+                break;
+            case MethodPost:
+                if(selected) {
+                    if (!supportMethod.contains(httpConfigStrMap.get(UIConfigEnum.MethodPost))) {
+                        supportMethod.add(httpConfigStrMap.get(UIConfigEnum.MethodPost));
                     } else {
-                        autoRepeater = false;
+                        if (supportMethod.contains(httpConfigStrMap.get(UIConfigEnum.MethodPost))) {
+                            supportMethod.remove(httpConfigStrMap.get(UIConfigEnum.MethodPost));
+                        }
                     }
-                    break;
-                case WithCookie:
-                    if(getCheckBoxStat(UICheckBoxType.WithCookie) == stats.ON) {
-                        withCookie = true;
+                }
+                break;
+            case MethodPut:
+                if(selected) {
+                    if (!supportMethod.contains(httpConfigStrMap.get(UIConfigEnum.MethodPut))) {
+                        supportMethod.add(httpConfigStrMap.get(UIConfigEnum.MethodPut));
                     } else {
-                        withCookie = false;
+                        if (supportMethod.contains(httpConfigStrMap.get(UIConfigEnum.MethodPut))) {
+                            supportMethod.remove(httpConfigStrMap.get(UIConfigEnum.MethodPut));
+                        }
                     }
-                    break;
-                case Code404:
-                    if(getCheckBoxStat(UICheckBoxType.Code404) == stats.ON) {
-                        filterCode.add(httpConfigStrMap.get(UICheckBoxType.Code404));
+                }
+                break;
+            case MethodHead:
+                if(selected) {
+                    if (!supportMethod.contains(httpConfigStrMap.get(UIConfigEnum.MethodHead))) {
+                        supportMethod.add(httpConfigStrMap.get(UIConfigEnum.MethodHead));
+                    } else {
+                        if (supportMethod.contains(httpConfigStrMap.get(UIConfigEnum.MethodHead))) {
+                            supportMethod.remove(httpConfigStrMap.get(UIConfigEnum.MethodHead));
+                        }
                     }
-                    break;
-                case Code403:
-                    if(getCheckBoxStat(UICheckBoxType.Code403) == stats.ON) {
-                        filterCode.add(httpConfigStrMap.get(UICheckBoxType.Code403));
-                    }
-                    break;
-                case Code401:
-                    if(getCheckBoxStat(UICheckBoxType.Code401) == stats.ON) {
-                        filterCode.add(httpConfigStrMap.get(UICheckBoxType.Code401));
-                    }
-                    break;
-                case Code500:
-                    if(getCheckBoxStat(UICheckBoxType.Code500) == stats.ON) {
-                        filterCode.add(httpConfigStrMap.get(UICheckBoxType.Code500));
-                    }
-                    break;
-                case MethodGET:
-                    if(getCheckBoxStat(UICheckBoxType.MethodGET) == stats.ON) {
-                        supportMethod.add(httpConfigStrMap.get(UICheckBoxType.MethodGET));
-                    }
-                    break;
-                case MethodPost:
-                    if(getCheckBoxStat(UICheckBoxType.MethodPost) == stats.ON) {
-                        supportMethod.add(httpConfigStrMap.get(UICheckBoxType.MethodPost));
-                    }
-                    break;
-                case MethodPut:
-                    if(getCheckBoxStat(UICheckBoxType.MethodPut) == stats.ON) {
-                        supportMethod.add(httpConfigStrMap.get(UICheckBoxType.MethodPut));
-                    }
-                    break;
-                case MethodHead:
-                    if(getCheckBoxStat(UICheckBoxType.MethodHead) == stats.ON) {
-                        supportMethod.add(httpConfigStrMap.get(UICheckBoxType.MethodHead));
-                    }
-                    break;
-            }
+                }
+                break;
+            case StatusCode:
+                String[] codes = input.replaceAll("\\s+", "").split(",");
+                for (String code : codes) {
 
+                    int statusCode;
+                    try {
+                        statusCode = Integer.parseInt(code);
+                    } catch (NumberFormatException e) {
+                        return false;
+                    }
+
+                    if (statusCode < 100 || statusCode >= 600) {
+                        return false;
+                    }
+                }
+                List<String> temp = Arrays.asList(codes);
+                filterCode = new ArrayList<>(temp);
+                break;
+            case BlackSuffix:
+                String[] bs = input.replaceAll("\\s+", "").split(",");
+                filterBlackSuffix = new ArrayList<>(Arrays.asList(bs));
+                break;
+            case BlackURL:
+                String[] bl = input.replaceAll("\\s+", "").split(",");
+                filterBlackURL = new ArrayList<>(Arrays.asList(bl));
+                break;
+            case BlackMIME:
+                String[] bm = input.replaceAll("\\s+", "").split(",");
+                filterBlackMIME = new ArrayList<>(Arrays.asList(bm));
+                break;
+            default:
+                break;
         }
-        if(valueChangeStatlock.tryLock(1, TimeUnit.SECONDS)) {
-            valueNeedSync = false;
-            valueChangeStatlock.unlock();
-        }
+        valueNeedSync = true;
+        valueChangeStatlock.unlock();
+        return true;
     }
 
-    public stats getCheckBoxStat(UICheckBoxType boxType) {
-        return UIStatMap.get(boxType);
-    }
 }
